@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils
 from model_embeddings import ModelEmbeddings
+from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 
@@ -329,6 +330,11 @@ class NMT(nn.Module):
         # Tensor Squeeze:
         # https://pytorch.org/docs/stable/torch.html#torch.squeeze
 
+        dec_state = self.decoder(Ybar_t, dec_state)
+        (dec_hidden, dec_cell) = dec_state
+        # 3, (b, src_len, h) .dot(b, h, 1) -> (b, src_len, 1) -> (b, src_len)
+        e_t = enc_hiddens_proj.bmm(dec_hidden.unsqueeze(2)).squeeze(2)
+
         # END YOUR CODE
 
         # Set e_t to -inf where enc_masks has 1
@@ -362,11 +368,19 @@ class NMT(nn.Module):
         # https://pytorch.org/docs/stable/torch.html#torch.cat
         # Tanh:
         # https://pytorch.org/docs/stable/torch.html#torch.tanh
-        dec_state = self.decoder(Ybar_t, dec_state)
-        dec_hidden, dec_cell = dec_state
-        e_t = torch.squeeze(
-            torch.bmm(enc_hiddens_proj, torch.unsqueeze(dec_hidden, 2)), 2)
+        
+        # 1, apply softmax to e_t
+        alpha_t = F.softmax(e_t, dim=1) # (b, src_len)
+        # 2, (b, 1, src_len) x (b, src_len, 2h) = (b, 1, 2h) -> (b, 2h)
+        # a_t = e_t.unsqueeze(1).bmm(enc_hiddens).squeeze(1)
+        att_view = (alpha_t.size(0), 1, alpha_t.size(1))
+        a_t = torch.bmm(alpha_t.view(*att_view), enc_hiddens).squeeze(1)
 
+        # 3, concate a_t (b, 2h) and dec_hidden (b, h) to U_t (b, 3h)
+        U_t = torch.cat((a_t, dec_hidden), dim=1)
+        # 4, apply combined output to U_T -> V_t, shape (b, h)
+        V_t = self.combined_output_projection(U_t)
+        O_t = self.dropout(torch.tanh(V_t))
 
         # END YOUR CODE
 

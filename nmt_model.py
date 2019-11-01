@@ -339,7 +339,7 @@ class NMT(nn.Module):
 
         # Set e_t to -inf where enc_masks has 1
         if enc_masks is not None:
-            e_t.data.masked_fill_(enc_masks.byte(), -float('inf'))
+            e_t.data.masked_fill_(enc_masks.bool(), -float('inf'))
 
         # YOUR CODE HERE (~6 Lines)
         # TODO:
@@ -368,7 +368,7 @@ class NMT(nn.Module):
         # https://pytorch.org/docs/stable/torch.html#torch.cat
         # Tanh:
         # https://pytorch.org/docs/stable/torch.html#torch.tanh
-        
+
         # 1, apply softmax to e_t
         alpha_t = F.softmax(e_t, dim=1) # (b, src_len)
         # 2, (b, 1, src_len) x (b, src_len, 2h) = (b, 1, 2h) -> (b, 2h)

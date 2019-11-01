@@ -211,6 +211,7 @@ def train(args: Dict):
                 # compute dev. ppl and bleu
                 # dev batch size can be a bit larger
                 dev_ppl = evaluate_ppl(model, dev_data, batch_size=128)
+                #dev_ppl = evaluate_ppl(model, dev_data, batch_size=64)
                 valid_metric = -dev_ppl
 
                 print('validation: iter %d, dev. ppl %f' %
